@@ -1,0 +1,41 @@
+#! /usr/bin/env bash
+
+set -euo pipefail
+
+PROJECT_ROOT="$(realpath $(dirname $0)/../)"
+
+set -x 
+
+# Copy required configuration files.
+scp Caddyfile compose.yml init-user-db.sh linkans@linkansevent.se: > /dev/null
+
+# Decrypt and copy secrets.
+age --decrypt --identity "$AGE_IDENTITY" secrets.env.enc | ssh linkans@linkansevent.se "cat > ~/.env"
+
+# Log in to container registry, pull image and restart services.
+age --decrypt --identity "$AGE_IDENTITY" ghcr-password.enc | ssh linkans@linkansevent.se "docker login --username Majsvaffla --password-stdin ghcr.io 2> /dev/null"
+ssh linkans@linkansevent.se "docker pull ghcr.io/majsvaffla/linkans:latest --quiet" > /dev/null
+ssh linkans@linkansevent.se "docker compose up --detach"
+
+set +x
+echo Running health checks...
+
+curl="curl -sS \
+    --retry 10 \
+    --retry-all-errors \
+    --retry-connrefused \
+    --retry-delay 1 \
+    --retry-max-time 5
+"
+
+function alive_or_exit {
+    if [[ $($@) != "Tackar som frågar!"* ]]; then
+        exit 1
+    fi
+}
+
+# Perform health checks.
+alive_or_exit ssh linkans@linkansevent.se "dotenv $curl http://localhost:8000/-/"
+alive_or_exit $curl https://linkansevent.se/-/
+
+echo Deployment successful!

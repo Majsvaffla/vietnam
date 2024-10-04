@@ -1,0 +1,28 @@
+{
+	email davidsvenson@outlook.com
+}
+
+makavaf.al {
+	log {
+		output file /logs/access.log {
+			roll_size 1gb
+			roll_keep 14
+		}
+	}
+
+	route /static/* {
+		uri strip_prefix /static
+		file_server {
+			root /srv
+		}
+	}
+
+	route /media/* {
+		uri strip_prefix /media
+		file_server {
+			root /srv
+		}
+	}
+
+	reverse_proxy app:8000
+}

@@ -1,0 +1,7 @@
+.cache
+.github
+.media_root
+.static_root
+.env
+.envrc
+.gitignore
